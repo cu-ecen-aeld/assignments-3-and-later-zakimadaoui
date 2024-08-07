@@ -28,7 +28,11 @@ int main(int argc, char *argv[]) {
   if (!fputc('\n', f)) {
     syslog(LOG_ERR, "could write to file %s. Errno %d.", write_path, errno);
   }
+<<<<<<< HEAD
   
+=======
+
+>>>>>>> 63871ce ( assingment2 submission)
   // do not forget to close the file
   fclose(f);
 
