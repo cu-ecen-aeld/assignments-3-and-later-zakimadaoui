@@ -1,11 +1,14 @@
-ifdef CROSS_COMPILE
-SYSROOT=$(shell $(CROSS_COMPILE)gcc -print-sysroot)
+ifdef CC
+SYSROOT=$(shell $(CC) -print-sysroot)
 else
 SYSROOT=/
-endif 
+endif
+all: default
+
 default: 
-	$(CROSS_COMPILE)gcc -g -Wall -c writer.c -o writer.o 
-	$(CROSS_COMPILE)gcc -g -Wall -I$(SYSROOT) writer.o -o writer 
+	$(CC) -g -Wall -c writer.c -o writer.o 
+	$(CC) -g -Wall -I$(SYSROOT) writer.o -o writer 
+
 clean: 
 	rm -f writer.o
 	rm -f writer
