@@ -48,7 +48,7 @@ int main(int argc, char** argv) {
     hints.ai_family = AF_INET;  // use IPv4
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE;
-    getaddrinfo("127.0.0.1", "9000", &hints, &res);
+    getaddrinfo("0.0.0.0", "9000", &hints, &res);
     sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol); 
     if (sockfd == -1) {
         freeaddrinfo(res);
