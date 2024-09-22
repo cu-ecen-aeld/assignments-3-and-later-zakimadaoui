@@ -6,7 +6,7 @@
 # AllowAllParametersOfDeclarationOnNextLine: 'false'
 # AllowShortBlocksOnASingleLine: 'false'
 # AllowShortCaseLabelsOnASingleLine: 'false'
-# AllowShortFunctionsOnASingleLine: None
+AllowShortFunctionsOnASingleLine: All
 # AllowShortIfStatementsOnASingleLine: 'false'
 # AllowShortLoopsOnASingleLine: 'false'
 # AlwaysBreakAfterReturnType: All
@@ -34,7 +34,7 @@
 # SpacesInParentheses: 'false'
 # SpacesInSquareBrackets: 'false'
 # AlignTrailingComments: 'true'
-ColumnLimit: '80'
+ColumnLimit: '100'
 SortIncludes: 'false'
 IndentWidth: '4'
 Language: Cpp
