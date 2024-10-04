@@ -25,11 +25,18 @@
 #define PDEBUG(fmt, args...) /* not debugging: nothing */
 #endif
 
+#include <linux/mutex.h>
+
+
 struct aesd_dev {
     int major;
     int minor;
-    // TODO: add locks needed for synchronizing concurrent operations on the buffer
+    int opened;
+    int history_read_complete;
+    int pending_write;
+    struct mutex buffer_lock;
     struct aesd_circular_buffer buffer;
+    struct aesd_buffer_entry pending_entry;
     struct cdev cdev; /* Char device structure      */
 };
 

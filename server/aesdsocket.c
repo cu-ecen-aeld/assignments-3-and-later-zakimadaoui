@@ -14,7 +14,16 @@
 #include <fcntl.h>
 #include <time.h>
 
-#define OUT_FILE "/var/tmp/aesdsocketdata"
+#define USE_AESD_CHAR_DEVICE 1 
+
+#if USE_AESD_CHAR_DEVICE == 1
+    #define OUT_FILE "/dev/aesd_char"
+#else
+    #define OUT_FILE "/var/tmp/aesdsocketdata"
+#endif
+
+
+
 
 int run = 1;
 int sockfd = -1;
@@ -90,7 +99,9 @@ int main(int argc, char **argv) {
     // ----------------------------------------------------------------------------
     openlog("aesdsocket", 0, LOG_USER);
     char server_ip[INET_ADDRSTRLEN];
+#if USE_AESD_CHAR_DEVICE != 1
     remove(OUT_FILE);
+#endif
     signal(SIGINT, handle_signal);
     signal(SIGTERM, handle_signal);
     // ----------------------------------------------------------------------------
@@ -152,7 +163,9 @@ int main(int argc, char **argv) {
     // Initialize the head before use
     TAILQ_INIT(&queue);
     pthread_mutex_init(&out_file_sync, NULL);
+#if USE_AESD_CHAR_DEVICE != 1
     setup_timer();
+#endif
 
     while (run) {
         // Listen for and accept a connection
@@ -208,7 +221,9 @@ int main(int argc, char **argv) {
     }
 
     close(sockfd);
+#if USE_AESD_CHAR_DEVICE != 1
     remove(OUT_FILE);
+#endif
     closelog();
     return 0;
 }
