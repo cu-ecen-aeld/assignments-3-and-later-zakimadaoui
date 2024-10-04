@@ -19,6 +19,7 @@
 #include <linux/fs.h> // file_operations
 #include <linux/mutex.h>
 #include "aesdchar.h"
+#include <linux/slab.h>
 
 MODULE_AUTHOR("Zakaria Madaoui");
 MODULE_LICENSE("Dual BSD/GPL");
@@ -175,7 +176,9 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count, loff
     
     // if the buffer is full, first de-allocate the old history line we are about to overwrite
     if (circ_buff->full) {
-        kfree(&circ_buff->entry[circ_buff->in_offs]);
+        printk(KERN_WARNING "Buffer is full, deleting the oldest entry");
+        kfree(circ_buff->entry[circ_buff->in_offs].buffptr);
+        circ_buff->entry[circ_buff->in_offs].size = 0;
     }
     aesd_circular_buffer_add_entry(circ_buff, &entry);
     mutex_unlock(&aesd_device.buffer_lock);
