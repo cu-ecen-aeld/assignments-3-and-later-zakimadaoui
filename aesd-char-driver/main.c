@@ -19,6 +19,7 @@
 #include <linux/fs.h> // file_operations
 #include <linux/mutex.h>
 #include "aesdchar.h"
+#include "aesd_ioctl.h"
 #include <linux/slab.h>
 
 MODULE_AUTHOR("Zakaria Madaoui");
@@ -277,6 +278,45 @@ loff_t aesd_llseek(struct file *filp, loff_t off, int whence) {
     return newpos;
 }
 
+long aesd_ioctl(struct file *filp, unsigned int cmd, unsigned long value) {
+    struct aesd_dev *dev = filp->private_data;
+    if (cmd == AESDCHAR_IOCSEEKTO) {
+        struct aesd_seekto seekto;
+        copy_from_user(&seekto, (void *)value, sizeof(struct aesd_seekto));
+        PDEBUG("ioctl: seeking to write_cmd: %u write_cmd_offset: %u", seekto.write_cmd,
+               seekto.write_cmd_offset);
+
+        if (seekto.write_cmd > AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED)
+            return -1;
+        mutex_lock_interruptible(&dev->buffer_lock);
+
+        size_t i = dev->buffer.out_offs;
+        struct aesd_buffer_entry *entry;
+        struct aesd_circular_buffer *circ_buff = &dev->buffer;
+        ssize_t cursor = 0;
+        if (dev->buffer.entry[0].size == 0 && seekto.write_cmd_offset != 0) {
+            mutex_unlock(&dev->buffer_lock);
+            return -1;
+        }
+        do {
+            entry = &circ_buff->entry[i];
+            if (i == seekto.write_cmd) {
+                cursor += seekto.write_cmd_offset;
+                filp->f_pos = cursor;
+                break;
+            } else if (entry->buffptr != NULL && entry->size != 0) {
+                cursor += entry->size;
+            }
+            i = (i + 1) % AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED;
+        } while ((i != dev->buffer.in_offs));
+
+        mutex_unlock(&dev->buffer_lock);
+        return 0;
+    } else {
+        return -1;
+    }
+}
+
 struct file_operations aesd_fops = {
     .owner = THIS_MODULE,
     .read = aesd_read,
@@ -284,6 +324,7 @@ struct file_operations aesd_fops = {
     .open = aesd_open,
     .release = aesd_close,
     .llseek = aesd_llseek,
+    .unlocked_ioctl = aesd_ioctl,
 };
 
 static int aesd_setup_cdev(struct aesd_dev *dev, dev_t devno) {
