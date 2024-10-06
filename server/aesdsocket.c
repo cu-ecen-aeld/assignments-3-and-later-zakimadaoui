@@ -251,18 +251,21 @@ void *run_client_request(void *info) {
                 }
             }
 
+            // TODO: need to add logs here and debug why iocl is not getting triggered
             // write all received data or untill the new line character.
             pthread_mutex_lock(&out_file_sync);
-            FILE *outf = fopen(OUT_FILE, "ab");
             if (memcmp("AESDCHAR_IOCSEEKTO:", buffer, 19) == 0) {
+                int driver_fd = open(OUT_FILE, O_RDWR);
                 struct aesd_seekto seekto;
                 sscanf((char*) buffer, "AESDCHAR_IOCSEEKTO:%d,%d", &seekto.write_cmd, &seekto.write_cmd_offset);
-                ioctl(fd, AESDCHAR_IOCSEEKTO, &seekto); 
+                ioctl(driver_fd, AESDCHAR_IOCSEEKTO, &seekto); 
+                close(driver_fd);
             } else {
+                FILE *outf = fopen(OUT_FILE, "ab");
                 fwrite(buffer, 1, bytes, outf);
                 fflush(outf);
+                fclose(outf);
             }
-            fclose(outf);
             pthread_mutex_unlock(&out_file_sync);
 
             if (nl_found)
