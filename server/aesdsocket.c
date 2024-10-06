@@ -13,6 +13,7 @@
 #include <pthread.h>
 #include <fcntl.h>
 #include <time.h>
+#include "aesd_ioctl.h"
 
 #define USE_AESD_CHAR_DEVICE 1 
 
@@ -235,7 +236,7 @@ void *run_client_request(void *info) {
     uint8_t buffer[BUFSIZ];
 
     // read from client until a new line is received
-    FILE *outf = fopen(OUT_FILE, "ab");
+
     while (1) {
         ssize_t bytes = recv(fd, buffer, BUFSIZ, 0);
         if (bytes <= 0) { // error or connection closed
@@ -252,19 +253,28 @@ void *run_client_request(void *info) {
 
             // write all received data or untill the new line character.
             pthread_mutex_lock(&out_file_sync);
-            fwrite(buffer, 1, bytes, outf);
-            fflush(outf);
+            FILE *outf = fopen(OUT_FILE, "ab");
+            if (memcmp("AESDCHAR_IOCSEEKTO:", buffer, 19) == 0) {
+                struct aesd_seekto seekto;
+                sscanf((char*) buffer, "AESDCHAR_IOCSEEKTO:%d,%d", &seekto.write_cmd, &seekto.write_cmd_offset);
+                ioctl(fd, AESDCHAR_IOCSEEKTO, &seekto); 
+            } else {
+                fwrite(buffer, 1, bytes, outf);
+                fflush(outf);
+            }
+            fclose(outf);
             pthread_mutex_unlock(&out_file_sync);
+
             if (nl_found)
                 break;
         }
     }
-    fclose(outf);
+    
 
     // write OUT_FILE contents back to client
     pthread_mutex_lock(&out_file_sync); // write access shouldn't be allowed
                                         // while we are reading
-    outf = fopen(OUT_FILE, "rb");
+    FILE *outf = fopen(OUT_FILE, "rb");
     while (!feof(outf)) {
         size_t bytes = fread(buffer, 1, BUFSIZ, outf);
         send(fd, (void *)buffer, bytes, 0);
