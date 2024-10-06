@@ -32,7 +32,6 @@ struct aesd_dev {
     int major;
     int minor;
     int opened;
-    int history_read_complete;
     int pending_write;
     struct mutex buffer_lock;
     struct aesd_circular_buffer buffer;
