@@ -113,21 +113,31 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count, loff_t *f_p
     do {
         current_entry = circ_buff->entry[i];
         PDEBUG("reading entry at index %zu, buffent_end %zu", i, buffer_end);
-        if ((bytes_written + current_entry.size) > count ||
-            current_entry.size == 0) { // this history entry will not fit in the buffer or is empty
-            break;
+        if (current_entry.size == 0 || bytes_written >= count)
+            break; // quit if the history entry is empty
+
+        char *history_entry = current_entry.buffptr;
+        if (r_pos != 0) {
+            history_entry += r_pos;
+            r_pos = 0;
         }
-        size_t not_written = copy_to_user(write_ptr, current_entry.buffptr, current_entry.size);
+        size_t bytes_to_write = (bytes_written + current_entry.size) > count
+                                    ? (count - bytes_written)
+                                    : current_entry.size;
+
+        size_t not_written = copy_to_user(write_ptr, history_entry, bytes_to_write);
         if (not_written)
             printk(KERN_ERR "aesdchar: failed to write %zu bytes to userspace\n", not_written);
-        write_ptr += current_entry.size;     // Advance the write pointer
-        bytes_written += current_entry.size; // Increment the total number of bytes written
+        write_ptr += bytes_to_write; // Advance the write pointer
+        bytes_written +=
+            bytes_to_write - not_written; // Increment the total number of bytes written
 
         i = (i + 1) % AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED;
-    } while (i != buffer_end);
+    } while ((i != buffer_end) || (bytes_written >= count));
 
     result = bytes_written;
-    *f_pos+= bytes_written; // update fpos so that next time we continue reading from the same position
+    *f_pos +=
+        bytes_written; // update fpos so that next time we continue reading from the same position
 
 read_end:
     mutex_unlock(&dev->buffer_lock); // unlock the buffer mutex after read operation
@@ -237,7 +247,7 @@ loff_t aesd_llseek(struct file *filp, loff_t off, int whence) {
     PDEBUG("llseek: mode: %s, off: %lld", mode[whence], off);
 
     switch (whence) {
-    case SEEK_SET: 
+    case SEEK_SET:
         newpos = off;
         break;
 
