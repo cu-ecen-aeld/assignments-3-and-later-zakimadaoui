@@ -15,12 +15,14 @@
 #include <time.h>
 #include "aesd_ioctl.h"
 
-#define USE_AESD_CHAR_DEVICE 1 
+#define USE_AESD_CHAR_DEVICE 1
 
 #if USE_AESD_CHAR_DEVICE == 1
-    #define OUT_FILE "/dev/aesd_char"
+    #define OUT_FILE "/dev/aesdchar"
+    #define OUT_RW "r+"
 #else
     #define OUT_FILE "/var/tmp/aesdsocketdata"
+    #define OUT_RW "ab"
 #endif
 
 
@@ -232,6 +234,8 @@ int main(int argc, char **argv) {
 void *run_client_request(void *info) {
     int fd = ((connection_info *)info)->fd;
     char *client_ip = ((connection_info *)info)->client_ip;
+    FILE *outf = fopen(OUT_FILE, OUT_RW);
+    int driver_fd = fileno(outf);
 
     uint8_t buffer[BUFSIZ];
 
@@ -250,21 +254,21 @@ void *run_client_request(void *info) {
                     break;
                 }
             }
+            syslog(LOG_DEBUG,"received %ld bytes and new line found %d\n", bytes, nl_found);
 
             // TODO: need to add logs here and debug why iocl is not getting triggered
             // write all received data or untill the new line character.
             pthread_mutex_lock(&out_file_sync);
             if (memcmp("AESDCHAR_IOCSEEKTO:", buffer, 19) == 0) {
-                int driver_fd = open(OUT_FILE, O_RDWR);
+                syslog(LOG_DEBUG,"this is an ioctl command: \n");
                 struct aesd_seekto seekto;
                 sscanf((char*) buffer, "AESDCHAR_IOCSEEKTO:%d,%d", &seekto.write_cmd, &seekto.write_cmd_offset);
+                syslog(LOG_DEBUG,"X: %u, Y:%u !\n", seekto.write_cmd, seekto.write_cmd_offset);
                 ioctl(driver_fd, AESDCHAR_IOCSEEKTO, &seekto); 
-                close(driver_fd);
             } else {
-                FILE *outf = fopen(OUT_FILE, "ab");
+                syslog(LOG_DEBUG,"this is a normal write command...\n");
                 fwrite(buffer, 1, bytes, outf);
                 fflush(outf);
-                fclose(outf);
             }
             pthread_mutex_unlock(&out_file_sync);
 
@@ -277,7 +281,6 @@ void *run_client_request(void *info) {
     // write OUT_FILE contents back to client
     pthread_mutex_lock(&out_file_sync); // write access shouldn't be allowed
                                         // while we are reading
-    FILE *outf = fopen(OUT_FILE, "rb");
     while (!feof(outf)) {
         size_t bytes = fread(buffer, 1, BUFSIZ, outf);
         send(fd, (void *)buffer, bytes, 0);

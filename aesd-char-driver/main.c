@@ -80,7 +80,7 @@ int aesd_close(struct inode *inode, struct file *filp) {
 }
 
 ssize_t aesd_read(struct file *filp, char __user *buf, size_t count, loff_t *f_pos) {
-    PDEBUG("read %zu bytes with offset %lld", count, *f_pos);
+    PDEBUG("read %zu bytes with offset %lld, while other fpos is  %lld", count, *f_pos, filp->f_pos);
     struct aesd_dev *dev = filp->private_data;
 
     // not allowed to read/write if not already open
@@ -290,28 +290,32 @@ long aesd_ioctl(struct file *filp, unsigned int cmd, unsigned long value) {
             return -1;
         mutex_lock_interruptible(&dev->buffer_lock);
 
+        PDEBUG("ioctl seeking: out_off %u in_off: %u", dev->buffer.out_offs, dev->buffer.in_offs);
         size_t i = dev->buffer.out_offs;
         struct aesd_buffer_entry *entry;
         struct aesd_circular_buffer *circ_buff = &dev->buffer;
         ssize_t cursor = 0;
-        if (dev->buffer.entry[0].size == 0 && seekto.write_cmd_offset != 0) {
-            mutex_unlock(&dev->buffer_lock);
-            return -1;
-        }
+        int ret = 0;
         do {
+            PDEBUG("looking for entry, currently at: %lu, while target is %u\n", i, seekto.write_cmd);
             entry = &circ_buff->entry[i];
             if (i == seekto.write_cmd) {
-                cursor += seekto.write_cmd_offset;
-                filp->f_pos = cursor;
+                if (entry->size <= seekto.write_cmd_offset || entry->buffptr == NULL) {
+                    ret = -1;
+                } else {
+                    PDEBUG("found entry, updating fpos to: %ld\n", cursor);
+                    cursor += seekto.write_cmd_offset;
+                    filp->f_pos = cursor;
+                }
                 break;
-            } else if (entry->buffptr != NULL && entry->size != 0) {
+            } else if (entry->buffptr != NULL) {
                 cursor += entry->size;
             }
             i = (i + 1) % AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED;
         } while ((i != dev->buffer.in_offs));
 
         mutex_unlock(&dev->buffer_lock);
-        return 0;
+        return ret;
     } else {
         return -1;
     }
