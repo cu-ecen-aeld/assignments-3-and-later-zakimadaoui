@@ -117,15 +117,12 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count, loff_t *f_p
         if (current_entry.size == 0 || bytes_written >= count)
             break; // quit if the history entry is empty
 
+        size_t bytes_to_write = min(count - bytes_written, current_entry.size - r_pos);
         char *history_entry = current_entry.buffptr;
         if (r_pos != 0) {
             history_entry += r_pos;
             r_pos = 0;
         }
-        size_t bytes_to_write = (bytes_written + current_entry.size) > count
-                                    ? (count - bytes_written)
-                                    : current_entry.size;
-
         size_t not_written = copy_to_user(write_ptr, history_entry, bytes_to_write);
         if (not_written)
             printk(KERN_ERR "aesdchar: failed to write %zu bytes to userspace\n", not_written);
